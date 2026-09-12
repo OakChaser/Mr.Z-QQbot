@@ -1,0 +1,29 @@
+[project]
+name = "conic-qqbot"
+version = "0.1.0"
+description = "Conic QQ Bot - Revived from smart-driver"
+requires-python = ">=3.10"
+dependencies = [
+    "nonebot2",
+    "nonebot2[fastapi]",
+    "nonebot-adapter-onebot",
+    "cn2an",
+    "httpx",
+    "playwright",
+    "markdown",
+    "pymdown-extensions",
+    "jinja2",
+    "aiofiles",
+    "Pillow",
+    "mcstatus",
+    "humanize",
+    "psutil",
+    "apscheduler",
+    "nonebot-plugin-apscheduler",
+    "pydantic",
+]
+
+[tool.nonebot]
+plugins = ["nonebot_plugin_apscheduler"]
+plugin_dirs = ["src/plugins"]
+

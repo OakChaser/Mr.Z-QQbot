@@ -1,0 +1,26 @@
+# Env / secrets
+.env
+.env.prod
+.env.docker
+*.env.local
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Logs
+*.log
+
+# NapCat runtime — QQ session/credentials, configs, data (setup fresh per machine)
+napcat/
+
+# Runtime data — chat history, member lists, memory, user profiles
+data/
+
+# Plugin runtime config — regenerates on first use
+src/plugins/namelist/namelist.json
+
+# macOS
+.DS_Store
