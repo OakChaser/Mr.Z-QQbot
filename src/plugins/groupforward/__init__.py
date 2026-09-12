@@ -6,6 +6,7 @@ from pathlib import Path
 from apscheduler.triggers.cron import CronTrigger
 from nonebot import get_bots, get_plugin_config, on_command
 from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent
+from nonebot.adapters.onebot.v11.exception import ActionFailed
 from nonebot.log import logger
 from nonebot.plugin import PluginMetadata, require
 
@@ -147,7 +148,16 @@ async def _sync_one(bot: Bot, gid: int, target_group: int) -> int:
     kwargs: dict = {"group_id": gid, "count": MAX_FETCH}
     if anchor:
         kwargs["message_seq"] = anchor
-    resp = await bot.call_api("get_group_msg_history", **kwargs)
+    try:
+        resp = await bot.call_api("get_group_msg_history", **kwargs)
+    except ActionFailed as e:
+        msg = str(getattr(e, "message", "") or getattr(e, "wording", "") or "")
+        if anchor and ("不存在" in msg or "not exist" in msg.lower() or "not found" in msg.lower()):
+            logger.warning(f"[groupforward] 源群={gid} 锚点 {anchor} 已失效（{msg}），回退为全量拉取最近消息")
+            anchor = None
+            resp = await bot.call_api("get_group_msg_history", group_id=gid, count=MAX_FETCH)
+        else:
+            raise
     msgs = resp.get("messages") if isinstance(resp, dict) else (resp or [])
     logger.info(
         f"[groupforward] get_group_msg_history 源群={gid} 锚点={anchor} 返回 {len(msgs) if isinstance(msgs, list) else '?'} 条"
@@ -164,16 +174,21 @@ async def _sync_one(bot: Bot, gid: int, target_group: int) -> int:
         logger.info(f"[groupforward] 源群={gid} 没有新消息")
         return 0
 
-    # 去掉锚点消息本身，按时间升序取其后消息
+    # 去掉锚点消息本身，过滤系统通知（加群/退群等无实际消息段），按时间升序取其后消息
     anchor_str = str(anchor) if anchor else None
+    total_raw = len(msgs) if isinstance(msgs, list) else 0
     new_msgs = [
         m
         for m in msgs
         if isinstance(m, dict)
         and _msg_id(m) is not None
         and str(_msg_id(m)) != anchor_str
+        and (m.get("message") or [])
     ]
     new_msgs.sort(key=lambda m: m.get("time") or 0)
+    skipped = total_raw - len(new_msgs)
+    if skipped > 0:
+        logger.info(f"[groupforward] 源群={gid} 已过滤系统通知等不可转发消息 {skipped} 条")
     if not new_msgs:
         logger.info(f"[groupforward] 源群={gid} 没有新消息")
         return 0
