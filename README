@@ -1,0 +1,227 @@
+===================================================
+Mr.Z QQ Bot — A Group Chat Bot (NoneBot2 + NapCat)
+===================================================
+
+A QQ group-chat bot built on **NoneBot2** with the **OneBot v11** adapter and
+**NapCat**. Plugin-based architecture with ready-to-use features including
+daily greetings, cross-group message forwarding, web/image rendering, web
+search, and Minecraft server status queries.
+
+.. contents:: Table of Contents
+   :depth: 3
+
+------------
+Features
+------------
+
+Commands (prefixes are optional, type the name directly):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Command
+     - Description
+   * - ``/search <keywords>`` / ``/web``
+     - Concurrent multi-backend search (DuckDuckGo / Bing), merged and de-duplicated
+   * - ``/jrrp``
+     - Daily luck score; deterministically derived from the date + user QQ number,
+       so the result is stable for the whole day
+   * - ``/alipay <amount>`` / ``/pay``
+     - Plays the Alipay "payment received" voice memo. Digits and Chinese amounts
+       are both supported (e.g. ``/alipay 114514``)
+   * - ``/mc <server address>``
+     - Query a Minecraft Java server (online players / latency / MOTD)
+   * - ``/mc motd|ping|player|status <address>``
+     - Sub-commands of ``/mc`` for a single field
+   * - ``text2pic <text>``
+     - Render text to an image (Playwright)
+   * - ``md2pic``
+     - Render ``doc/rule.md`` to an image
+   * - ``html2pic <url>``
+     - Full-page screenshot of a URL; only the top portion when beyond max height
+   * - ``/member update``
+     - Manually refresh the current group's member list cache
+   * - ``/member show``
+     - Show the current group's member list as an image table
+   * - ``/sync``
+     - Forward new messages from configured source groups to the current group
+       as merged forward cards
+   * - Poke the bot (group / private)
+     - Triggers a server status report (``nonebot-plugin-status``)
+
+Automatic behavior:
+
+* **Daily greetings** — greeting messages at 08:10 / 14:00 / 20:00 to the
+  configured groups.
+* **Scheduled group sync** — at 09:00 every day, forward new messages from
+  source groups to the target groups.
+* **Welcome messages** — a random welcome line when someone joins the group.
+* **Member tracking** — the member list cache is refreshed on join/leave
+  notices.
+* **Goodnight replies** — keywords such as "睡觉了 / 碎觉了 / 睡了" get a
+  goodnight reply.
+* **Blacklist / whitelist** — messages from listed users are silently dropped
+  (management is SuperUser-only).
+
+------------
+Quick Start
+------------
+
+Requirements: Python >= 3.10 (3.12 inside Docker).
+
+Local run
+================
+
+.. code-block:: bash
+
+   # 1. Configure environment variables
+   cp .env.example .env      # fill in SUPERUSERS / QQ_ACCOUNT, etc.
+
+   # 2. One-command launch (auto-creates .venv and installs deps + Chromium)
+   ./start.sh
+
+Docker run
+================
+
+.. code-block:: bash
+
+   # 1. Create the NapCat login config
+   echo "QQ_ACCOUNT=<bot_qq_uin>" > .env.docker
+
+   # 2. Start (auto-generates NapCat OneBot config and builds the image)
+   ./start.sh docker
+
+   # 3. Log in to QQ by scanning the QR code
+   #    Open the NapCat WebUI at http://localhost:6099
+
+Other commands:
+
+.. code-block:: bash
+
+   ./start.sh stop        # stop (docker compose down)
+   ./start.sh logs        # tail logs (docker compose logs -f)
+   ./rebuild-bot.sh       # rebuild and restart the bot service
+
+-------------
+Configuration
+-------------
+
+All configuration is injected through environment variables; NoneBot2 reads
+them automatically as snake_case options. Key variables:
+
+.. code-block:: ini
+
+   HOST=0.0.0.0
+   PORT=6060
+   LOG_LEVEL=INFO
+   SUPERUSERS=["<your_qq_uin>"]        # admin QQ number
+   COMMAND_START=["/", ""]            # command prefix ("" = no prefix needed)
+   QQ_ACCOUNT=<bot_qq_uin>            # bot QQ number
+
+Daily greeting / group sync:
+
+.. code-block:: ini
+
+   GREETING_TARGETS=["<group_id>"]              # groups that get daily greetings
+   FORWARD_SOURCE_GROUPS=["<group_id>"]         # source groups for /sync
+   SYNC_TARGET_GROUPS=["<group_id>"]            # scheduled-sync targets (daily 09:00)
+   GREETING_TEST_TIME="HH:MM:SS"                # optional, test greeting trigger time
+
+Search backend:
+
+.. code-block:: ini
+
+   WEB_SEARCH_BACKEND=bing,ddg                 # comma-separated, default is all
+
+Tool (read-only) access control:
+
+.. code-block:: ini
+
+   TOOL_ALLOW_DIRS=/home/host,/app/data         # allowed directories
+   TOOL_DENY=.ssh,.aws,.env,id_rsa,.pem,...     # forbidden path fragments
+   TOOL_MAX_OUT=3000                            # max chars per tool output
+
+Env files:
+
+* ``.env`` — main config (gitignored, see ``.env.example``)
+* ``.env.prod`` — production override (gitignored)
+* ``.env.docker`` — only ``QQ_ACCOUNT``, used by NapCat to log in
+
+--------------
+Project Layout
+--------------
+
+.. code-block:: text
+
+   bot.py                      # entry point: init NoneBot2, register OneBot v11
+   pyproject.toml              # dependencies + [tool.nonebot] plugin loading
+   start.sh                    # one-command start (local / docker / stop / logs)
+   docker-compose.yml          # napcat + bot services
+   Dockerfile                  # bot image (includes Playwright system deps)
+   src/plugins/
+     websearch/                # search commands + reusable web_search() library
+     htmlrender/               # Playwright renderer (text/markdown/html -> image)
+     imagerender/              # text2pic / md2pic / html2pic commands
+     namelist/                 # blacklist / whitelist (silent preprocessor drop)
+     members/                  # member tracking + /member list rendering
+     jrrp/                     # daily luck /jrrp + goodnight keywords
+     alipayvoice/              # Alipay voice memo /alipay
+     ping/                     # Minecraft server query /mc
+     welcome/                  # random welcome messages
+     restart/                  # bot restart command
+     daily_greeting/           # scheduled daily greetings
+     groupforward/             # cross-group merged forward sync
+     nonebot-plugin-apscheduler/ # APScheduler integration
+     nonebot-plugin-status/    # status / health check
+   napcat/                     # NapCat runtime data (gitignored)
+   data/                       # runtime data: members, forward anchors, etc. (gitignored)
+
+.. note::
+
+   ``src/plugins/websearch`` doubles as an importable library, so other plugins
+   can call ``web_search()`` directly.
+
+-------------------
+Docker Architecture
+-------------------
+
+``docker-compose.yml`` defines two services:
+
+* **napcat** — the QQ client with a WebUI (``6099`` port) that pushes events
+  back to the bot over WebSocket.
+* **bot** — the NoneBot2 service on ``6060``, talking to NapCat over
+  ``ws://bot:6060/onebot/v11/ws`` on the internal network.
+
+For live reload, the bot container mounts ``./src``, ``./data`` and ``bot.py``.
+Optionally, ``HOST_HOME`` mounts a host directory read-only as ``/home/host``
+inside the container (the bot's "computer").
+
+Troubleshooting
+================
+
+* **Restart only the bot without taking the whole compose down** — run
+  ``./rebuild-bot.sh``.
+* **Playwright Chromium missing** — run ``playwright install chromium`` locally
+  (already bundled in the Docker image).
+* **Group sync not working** — make sure ``FORWARD_SOURCE_GROUPS`` and
+  ``SYNC_TARGET_GROUPS`` are configured; otherwise the job is never scheduled.
+
+------------
+Tech Stack
+------------
+
+* NoneBot2 / nonebot-adapter-onebot — bot framework and the OneBot v11 adapter
+* NapCat — QQ protocol implementation (deployed via Docker)
+* Playwright + Pillow — render web pages, text and Markdown to images
+* APScheduler — daily greetings and scheduled sync
+* mcstatus — Minecraft server status queries
+* httpx — HTTP requests for search
+
+---------------------
+License / Maintenance
+---------------------
+
+This project evolved from ``smart-driver`` (project description: *Revived from
+smart-driver*). There is no built-in test suite or lint configuration; follow
+the existing plugin conventions when contributing.

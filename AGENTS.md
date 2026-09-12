@@ -1,4 +1,4 @@
-# AGENTS.md — conic-qqbot
+# AGENTS.md — mrz-qqbot
 
 ## Project
 

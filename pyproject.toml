@@ -1,7 +1,7 @@
 [project]
-name = "conic-qqbot"
+name = "mrz-qqbot"
 version = "0.1.0"
-description = "Conic QQ Bot - Revived from smart-driver"
+description = "Mr.Z QQ Bot - Revived from smart-driver"
 requires-python = ">=3.10"
 dependencies = [
     "nonebot2",
